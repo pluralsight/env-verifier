@@ -24,29 +24,32 @@ module.exports = {
 to get up and running quickly with a verified config file, you can replace the above with something like this:
 
 ```javascript
-const { verify } = require('env-verifier')
+const { strictVerify } = require('env-verifier')
 
-const config = {
+//throws on one or more env misses
+module.exports = strictVerify({
   database: {
-    name: DB_NAME
-    host: DB_HOST
-    password: DB_PASSWORD
+    name: 'DB_NAME',
+    host: 'DB_HOST',
+    password: 'DB_PASSWORD'
   },
-  baseUrl: BASE_URL
-}
-
-const { config: builtConfig, errors } = verify(config)
-
-errors.foreach(error => console.error(error))
-
-module.exports = builtConfig
+  baseUrl: 'BASE_URL'
+})
 ```
 
-This package exposes two verification functions - `verify` and `strictVerify`. Use `verify` (as seen above) when you want to handle reporting missing values, and `strictVerify` when you want us to throw a descriptive error.
+This package exposes two verification functions - `verify` and `strictVerify`. Use `verify` (as seen below) when you want to handle reporting missing values, and `strictVerify` (as seen above) when you want, when any `env` misses are encountered, us to throw a descriptive error containing all `env` misses.
 
 You can pass in your own `env` object as a parameter as long as its an object that is non-nested and has key value pairs with `undefined` or `string` as their value type.
 
-Function signatures:
+### Contents
+
+ - [Function Signatures](#functionSignatures)
+ - [Arbitrary Value Insertion](#arbitraryValueInsertion)
+ - [Error Generation and Reporting](#errorGenerationAndReporting)
+ - [Variable Transformation (TransformTuple)](#variableTransformation)
+ 
+
+#### <a name="functionSignatures"><a/> Function signatures
 
 ```typescript
 
@@ -74,18 +77,18 @@ interface Env {
   [key: string]: string | undefined
 }
 
-function insert(value: any): InsertValue //see inserting arbitrary values below
+function insert(value: any): InsertValue
 
-function verify(config: Config, env: Env = process.env): { config: MappedConfig, errors: string[] }
+function verify(config: ConfigWithEnvKeys, env: Env = process.env): { config: MappedConfig, errors: string[] }
 
-function strictVerify(config: Config, env: Env = process.env): VerifiedConfig //See Errors section
+function strictVerify(config: ConfigWithEnvKeys, env: Env = process.env): VerifiedConfig
 ```
 
-Use example for `strictVerify`:
+Use example for `verify`:
 
 ```javascript
 //will throw on undefined or empty string env variables
-module.exports = strictVerify({
+const { config, errors } = strictVerify({
   database: {
     name: 'DB_NAME'
     host: 'DB_HOST'
@@ -93,9 +96,14 @@ module.exports = strictVerify({
   },
   baseUrl: 'BASE_URL'
 })
+
+// do custom error logging, possibly throw your own errors
+errors.forEach(console.error)
+
+module.exports = config
 ```
 
-#### Arbitrary value insertion
+#### <a name="arbitraryValueInsertion"><a/> Arbitrary Value Insertion
 
 You may have values that aren't present on your `env` object, but that you would like to live in your config object, this can be achieved by using the `insert()` function.
 
@@ -114,16 +122,18 @@ module.exports = verify({
 }
 ```
 
-#### Error generation and reporting
+#### <a name="errorGenerationAndReporting"><a/> Error Generation and Reporting
 
 Error reports are generated when an `env` variable is missing. An `env` variable is considered missing under the following circumstances:
 
  - `undefined` is returned from the `env` object.
  - an empty string, `''`, is returned from the `env` object.
+ 
+ `verify` will always return the errors array, but it will be empty upon success.
 
 `strictVerify` will not throw an error on the first encountered missing `env` value. Instead it will continue in order to report all missing `env` variables.
 
-#### Variable Transformation (TransformTuple)
+#### <a name="variableTransformation"><a/> Variable Transformation (TransformTuple)
 
 Since process.env only returns strings, sometimes its necessary to transform those strings into something else (IE: transform the string `"true"` to a boolean `true`)
 
