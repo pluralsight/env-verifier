@@ -1,4 +1,10 @@
-import { verify, strictVerify, ConfigWithEnvKeys, insert } from './index'
+import {
+  verify,
+  strictVerify,
+  ConfigWithEnvKeys,
+  insert,
+  secret
+} from './index'
 
 describe('env-verify', () => {
   describe('verify', () => {
@@ -96,7 +102,6 @@ describe('env-verify', () => {
 
     it('runs the transform function and inserts the transformed value', () => {
       const transformed = ['hi', { there: ['this'] }, 'is', 'transformed']
-      const expected = expect.objectContaining(transformed)
 
       const configObj: ConfigWithEnvKeys = {
         present: ['PRESENT', (_envVal: string) => transformed]
@@ -104,7 +109,7 @@ describe('env-verify', () => {
 
       const { present: result } = verify(configObj, env).config
 
-      expect(result).toEqual(expected)
+      expect(result).toEqual(transformed)
     })
 
     it('still returns an error if the env value is missing', () => {
@@ -202,36 +207,104 @@ describe('env-verify', () => {
     })
   })
 
+  describe('with secret()', () => {
+    const env = {
+      PASSWORD: 'this is a password',
+      NOT_PASSWORD: 'this is not a password'
+    }
+
+    it('allows the use of the secret funciton', () => {
+      const configObj = {
+        password: secret('PASSWORD')
+      }
+
+      const result = verify(configObj, env)
+
+      expect(result.config.password).not.toBeUndefined()
+    })
+
+    it('obscures secret when config object is coerced to string', () => {
+      const configObj = {
+        password: secret('PASSWORD')
+      }
+
+      const result = verify(configObj, env).config
+
+      expect(JSON.stringify(result).includes('[secret]')).toBe(true)
+      expect(JSON.stringify(result).includes(env.PASSWORD)).toBe(false)
+    })
+
+    it('supports nested secrets', () => {
+      const configObj = {
+        hasAPassword: {
+          password: secret('PASSWORD')
+        }
+      }
+
+      const result = verify(configObj, env).config
+
+      expect(JSON.stringify(result).includes('[secret]')).toBe(true)
+      expect(JSON.stringify(result).includes(env.PASSWORD)).toBe(false)
+    })
+
+    it('supports many secrets', () => {
+      const configObj = {
+        hasAPassword: {
+          password: secret('PASSWORD'),
+          password2: secret('PASSWORD')
+        },
+        password: secret('PASSWORD')
+      }
+
+      const result = verify(configObj, env).config
+
+      console.log(result.toString())
+
+      expect(JSON.stringify(result).includes('[secret]')).toBe(true)
+      expect(JSON.stringify(result).includes(env.PASSWORD)).toBe(false)
+    })
+  })
+
   describe('integration of all features', () => {
     const env = {
-      PRESENT: 'present'
+      PRESENT: 'present',
+      SECRET: 'secret'
     }
+
+    const mixed: ConfigWithEnvKeys = {
+      present: 'PRESENT',
+      transformed: ['PRESENT', (_value: string) => 'transformed'],
+      inserted: insert('inserted'),
+      secret: secret('SECRET')
+    }
+
+    const configObj = {
+      mixed,
+      ...mixed
+    }
+
+    const { config: result } = verify(configObj, env)
+
     it('mixes and matches features across nested config object', () => {
-      const mixed: ConfigWithEnvKeys = {
-        present: 'PRESENT',
-        transformed: ['PRESENT', (_value: string) => 'transformed'],
-        inserted: insert('inserted')
-      }
-
-      const configObj = {
-        mixed,
-        ...mixed
-      }
-
       const expected = expect.objectContaining({
         present: 'present',
         transformed: 'transformed',
         inserted: 'inserted',
+        secret: 'secret',
         mixed: {
           present: 'present',
           transformed: 'transformed',
-          inserted: 'inserted'
+          inserted: 'inserted',
+          secret: 'secret'
         }
       })
 
-      const { config } = verify(configObj, env)
+      expect(result).toEqual(expected)
+    })
 
-      expect(config).toEqual(expected)
+    it('hides all secrets', () => {
+      expect(JSON.stringify(result).includes('"secret"')).not.toBe(true)
+      expect(JSON.stringify(result).includes('"[secret]"')).toBe(true)
     })
   })
 })
