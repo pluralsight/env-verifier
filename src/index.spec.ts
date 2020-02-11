@@ -258,8 +258,6 @@ describe('env-verify', () => {
 
       const result = verify(configObj, env).config
 
-      console.log(result.toString())
-
       expect(JSON.stringify(result).includes('[secret]')).toBe(true)
       expect(JSON.stringify(result).includes(env.PASSWORD)).toBe(false)
     })
@@ -268,7 +266,7 @@ describe('env-verify', () => {
   describe('integration of all features', () => {
     const env = {
       PRESENT: 'present',
-      SECRET: 'secret'
+      SECRET: 'somethingSecret'
     }
 
     const mixed: ConfigWithEnvKeys = {
@@ -290,21 +288,21 @@ describe('env-verify', () => {
         present: 'present',
         transformed: 'transformed',
         inserted: 'inserted',
-        secret: 'secret',
+        secret: '[secret]',
         mixed: {
           present: 'present',
           transformed: 'transformed',
           inserted: 'inserted',
-          secret: 'secret'
+          secret: '[secret]'
         }
       })
 
-      expect(result).toEqual(expected)
+      expect(JSON.parse(JSON.stringify(result))).toEqual(expected)
     })
 
     it('hides all secrets', () => {
-      expect(JSON.stringify(result).includes('"secret"')).not.toBe(true)
-      expect(JSON.stringify(result).includes('"[secret]"')).toBe(true)
+      expect(JSON.stringify(result).includes('somethingSecret')).not.toBe(true)
+      expect(JSON.stringify(result).includes('[secret]')).toBe(true)
     })
   })
 })
