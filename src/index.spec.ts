@@ -3,8 +3,8 @@ import * as util from 'util'
 import {
   verify,
   strictVerify,
-  ConfigWithEnvKeys,
   insert,
+  TransformTuple,
   secret
 } from './index'
 
@@ -84,7 +84,7 @@ describe('env-verify', () => {
       PRESENT: 'present'
     }
     it('allows a tuple with a string and transform function', () => {
-      const configObj: ConfigWithEnvKeys = {
+      const configObj = {
         present: ['PRESENT', (envVal: string): any => envVal]
       }
 
@@ -92,12 +92,12 @@ describe('env-verify', () => {
     })
 
     it('allows the same tuple in a nested object', () => {
-      const configObj: ConfigWithEnvKeys = {
+      const configObj = {
         nested: {
-          present: ['PRESENT', (envVal: string) => envVal]
+          present: ['PRESENT', (envVal: string) => envVal] as TransformTuple<string>
         }
       }
-      const result = verify(configObj, env).config
+      const result = verify<typeof configObj>(configObj, env).config
 
       expect(result.nested.present).toEqual(env.PRESENT)
     })
@@ -105,7 +105,7 @@ describe('env-verify', () => {
     it('runs the transform function and inserts the transformed value', () => {
       const transformed = ['hi', { there: ['this'] }, 'is', 'transformed']
 
-      const configObj: ConfigWithEnvKeys = {
+      const configObj = {
         present: ['PRESENT', (_envVal: string) => transformed]
       }
 
@@ -115,7 +115,7 @@ describe('env-verify', () => {
     })
 
     it('still returns an error if the env value is missing', () => {
-      const configObj: ConfigWithEnvKeys = {
+      const configObj = {
         missing: ['MISSING', (envValue: string) => envValue]
       }
 
@@ -203,7 +203,7 @@ describe('env-verify', () => {
         }
       }
 
-      const { config } = verify(configObj, env)
+      const { config } = verify<typeof configObj>(configObj, env)
 
       expect(config.a.nonEnvValue).toEqual('nonEnvValue')
     })
@@ -283,7 +283,7 @@ describe('env-verify', () => {
       SECRET: 'somethingSecret'
     }
 
-    const mixed: ConfigWithEnvKeys = {
+    const mixed = {
       present: 'PRESENT',
       transformed: ['PRESENT', (_value: string) => 'transformed'],
       inserted: insert('inserted'),
