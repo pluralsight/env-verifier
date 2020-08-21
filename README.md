@@ -65,52 +65,11 @@ You can pass in your own `env` object as a parameter as long as its an object th
 
 ## Usage Notes
 
- - [Function Signatures](#functionSignatures)
  - [Arbitrary Value Insertion](#arbitraryValueInsertion)
  - [Secret Insertion](#secretInsertion)
  - [Error Generation and Reporting](#errorGenerationAndReporting)
  - [Variable Transformation (TransformTuple)](#variableTransformation)
- 
-
-#### <a name="functionSignatures"><a/> Function signatures
-
-```typescript
-interface TransformFn {
-  (envValue: string): any
-}
-
-//see below
-// [envKeyName, TransformFn]
-type TransformTuple = [string, TransformFn]
-
-interface ConfigWithEnvKeys {
-  [key: string]: string | InsertValue | SecretKey | TransformTuple | ConfigWithEnvKeys
-}
-
-interface MappedConfig {
-  [key: string]: any | string | undefined | Secret | Config
-}
-
-interface VerifiedConfig {
-  [key: string]: any | string | Secret | VerifiedConfig
-}
-
-interface Env {
-  [key: string]: string | undefined
-}
-
-class Secret {
-  reveal(): string
-}
-
-function secret(envKey: string): SecretKey
-
-function insert(value: any): InsertValue
-
-function verify(config: ConfigWithEnvKeys, env: Env = process.env): { config: MappedConfig, errors: string[] }
-
-function strictVerify(config: ConfigWithEnvKeys, env: Env = process.env): VerifiedConfig
-```
+ - [Dynamic Typings](#dynamicTypings)
 
 #### <a name="arbitraryValueInsertion"><a/> Arbitrary Value Insertion
 
@@ -221,6 +180,60 @@ verify(config)
 ```
 
 Transformation functions will not be run if its corresponding env value is missing.
+
+#### <a name="dynamicTypings"><a/> Dynamic Typings
+
+`env-verifier` tries to give typescript typings for the config object that it returns, but needs a little help to get the correct types
+
+If you are using TypeScript, you can do the following:
+
+```typescript
+const config: {
+  a: 'A',
+  b: insert([1, 2])
+  c: {
+    d: ['A', (envValue) => ([envValue])]
+  }
+}
+
+const verifiedConfig = strictVerify(config)
+// typings:
+// typeof verifiedConfig = {
+//   a: VerifiedConfig<unknown>
+//   b: VerifiedConfig<unknown>
+//   c: VerifiedConfig<unknown>
+// }
+
+// add typeof config object
+const verifiedConfig = strictVerify<typeof config>(config)
+// better typings:
+// typeof verifiedConfig = {
+//   a: string,
+//   b: number[],
+//   c: {
+//     d: (string | (envVerify: any) => any)
+//   }
+// }
+
+// cast TransformTuple types correctly
+const config = {
+  a: 'A',
+  b: insert([1, 2])
+  c: {
+    d: ['A', (envValue) => ([envValue])] as TransformTuple<string>
+  }
+}
+
+const verifiedConfig = strictVerify<typeof config>(config)
+// best typings:
+// typeof verifiedConfig = {
+//   a: string,
+//   b: number[],
+//   c: {
+//     d: string
+//   }
+// }
+```
 
 ### Prerequisites
 
