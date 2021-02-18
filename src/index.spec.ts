@@ -137,7 +137,7 @@ describe('env-verify', () => {
     })
   })
 
-  describe('strictVerfiy', () => {
+  describe('strictVerify', () => {
     it('should throw an error on missing .env value', () => {
       const env = {
         a: 'A'
@@ -215,7 +215,7 @@ describe('env-verify', () => {
       NOT_PASSWORD: 'this is not a password'
     }
 
-    it('allows the use of the secret funciton', () => {
+    it('allows the use of the secret function', () => {
       const configObj = {
         password: secret('PASSWORD')
       }
@@ -264,7 +264,7 @@ describe('env-verify', () => {
       expect(JSON.stringify(result).includes(env.PASSWORD)).toBe(false)
     })
 
-    it('obuscates secrets when using util.inspect (for nodejs)', () => {
+    it('obfuscates secrets when using util.inspect (for nodejs)', () => {
       const configObj = {
         password: secret('PASSWORD')
       }

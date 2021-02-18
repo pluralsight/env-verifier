@@ -20,12 +20,12 @@
   "author": "Snugbear",
   "license": "MIT",
   "devDependencies": {
+    "@types/jest": "^26.0.10",
     "@types/node": "^12.7.1",
     "jest": "^26.4.0",
     "onchange": "^7.0.2",
-    "@types/jest": "^26.0.10",
     "prettier": "2.0.5",
     "ts-jest": "^26.2.0",
-    "typescript": "^3.9.7"
+    "typescript": "^4.1.5"
   }
 }

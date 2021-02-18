@@ -1,13 +1,19 @@
+type Cast<X extends any, Y extends any> = X extends Y ? X : Y
+
+type TransformTuple_<U extends any> = (string | ((_: string) => U))[] 
+
+type MappedConfigElement_<E extends any> = 
+  E extends any[] ? E extends TransformTuple_<infer R> ? R : never
+  : E extends InsertValue<infer U> ? U
+  : E extends SecretKey ? Secret
+  : E extends string ? string | undefined
+  : MappedConfig<E>
+
+type MappedConfigElement<E extends any> = MappedConfigElement_<E> extends infer X ? Cast<X, any> : never
+
+
 export type MappedConfig<T> = {
-  [P in keyof T]: T[P] extends SecretKey
-    ? Secret
-    : T[P] extends TransformTuple<infer U>
-    ? U | undefined
-    : T[P] extends InsertValue<infer U>
-    ? U
-    : T[P] extends string
-    ? string | undefined
-    : MappedConfig<T[P]>
+  [P in keyof T]: MappedConfigElement<T[P]>
 }
 
 export type TransformTuple<T> = [string, (_: string) => T]
@@ -27,7 +33,7 @@ export type ConfigWithEnvKeys<T> = {
 }
 
 interface VerifyParamCollection<T> {
-  config: ConfigWithEnvKeys<T>
+  config: T extends ConfigWithEnvKeys<T> ? T : never
   env: { [key: string]: string | undefined }
   path?: string
 }
@@ -101,7 +107,7 @@ const getMapConfigFunction = <T>({
   config,
   env,
   path = ''
-}: VerifyParamCollection<T>) => <P extends keyof T>(key: P): [Partial<MappedConfig<T>>, Error[]] => {
+}: VerifyParamCollection<T>) => <P extends keyof T>(key: P): [MappedConfigElement<T[P]>, Error[]] => {
   const value = config[key]
   const subPath = path.length === 0 ? key + '' : `${path}.${key}`
 
@@ -111,14 +117,14 @@ const getMapConfigFunction = <T>({
     const secretKey = value.secret
     const [secretValue, errors] = getEnvValueOrError(secretKey)
     return [
-      { [key]: getSecretObject(secretValue) } as Partial<MappedConfig<T>>,
+      { [key]: getSecretObject(secretValue) } as MappedConfigElement<T[P]>,
       errors
     ]
   }
 
   if (value instanceof InsertValue) {
     return [
-      { [key]: value.value } as Partial<MappedConfig<T>>,
+      { [key]: value.value } as MappedConfigElement<T[P]>,
       []
     ]
   }
@@ -127,10 +133,10 @@ const getMapConfigFunction = <T>({
     const [envKey, transformFn] = (value as any)
     const [envValue, errors] = getEnvValueOrError(envKey)
 
-    const transforedValue = envValue && transformFn(envValue)
+    const transformedValue = envValue && transformFn(envValue)
 
     return [
-      { [key]: transforedValue } as Partial<MappedConfig<T>>,
+      { [key]: transformedValue } as MappedConfigElement<T[P]>,
       errors
     ]
   }
@@ -139,7 +145,7 @@ const getMapConfigFunction = <T>({
     const [envValue, errors] = getEnvValueOrError(value as string)
 
     return [
-      { [key]: envValue } as Partial<MappedConfig<T>>,
+      { [key]: envValue } as MappedConfigElement<T[P]>,
       errors
     ]
   }
@@ -151,7 +157,7 @@ const getMapConfigFunction = <T>({
   })
 
   return [
-      { [key]: subConfig } as Partial<MappedConfig<T>>,
+      { [key]: subConfig } as MappedConfigElement<T[P]>,
       errors
     ]
 }
@@ -179,7 +185,7 @@ const recursiveVerify = <T>(
 }
 
 export function verify<T>(
-  config: ConfigWithEnvKeys<T>,
+  config: T extends ConfigWithEnvKeys<T> ? T : never,
   env: { [key: string]: string | undefined } = process.env
 ): { config: MappedConfig<T>; errors: string[] } {
   const { config: builtConfig, errors } = recursiveVerify({
@@ -195,7 +201,7 @@ export function verify<T>(
 }
 
 export function strictVerify<T>(
-  config: ConfigWithEnvKeys<T>,
+  config: T extends ConfigWithEnvKeys<T> ? T : never,
   env: { [key: string]: string | undefined } = process.env
 ): VerifiedConfig<T> {
   const { config: builtConfig, errors } = verify(config, env)
@@ -206,7 +212,7 @@ export function strictVerify<T>(
   return builtConfig as VerifiedConfig<T>
 }
 
-export function insert<T>(value: any): InsertValue<T> {
+export function insert<T>(value: T): InsertValue<T> {
   return new InsertValue(value)
 }
 
