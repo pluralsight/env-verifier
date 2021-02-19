@@ -57,24 +57,39 @@ describe('env-verify', () => {
       expect(results.config).toEqual(expected)
     })
     describe('with missing values', () => {
-      it('should return an error string', () => {
-        const env = {
-          PRESENT: 'present'
+      const env = {
+        PRESENT: 'present'
+      }
+      const config = {
+        1: 'PRESENT',
+        2: 'MISSING',
+        3: {
+          6: {
+            7: 'MISSING'
+          },
+          4: 'MISSING',
+          5: 'MISSING'
         }
-        const config = {
-          1: 'PRESENT',
-          2: 'MISSING',
-          3: {
-            6: {
-              7: 'MISSING'
-            },
-            4: 'MISSING',
-            5: 'MISSING'
-          }
-        }
-        const result = verify(config, env).errors
+      }
+      const verifiedConfig = verify(config, env)
 
-        expect(result.length).toEqual(4)
+      it('should return an array of missing values', () => {
+        const { missingValues } = verifiedConfig
+
+        expect(missingValues.length).toEqual(4)
+        expect(missingValues).toEqual(expect.arrayContaining([
+          { envKey: 'MISSING', path: '2' },
+          { envKey: 'MISSING', path: '3.6.7' },
+          { envKey: 'MISSING', path: '3.4' },
+          { envKey: 'MISSING', path: '3.4' },
+          { envKey: 'MISSING', path: '3.5' }
+        ]))
+      })
+      it('should return an array of missing value messages', () => {
+        const { missingValueMessages } = verifiedConfig
+
+        expect(missingValueMessages.length).toEqual(4)
+        missingValueMessages.forEach((item) => expect(typeof item === 'string').toBe(true))
       })
     })
   })
@@ -119,9 +134,9 @@ describe('env-verify', () => {
         missing: ['MISSING', (envValue: string) => envValue]
       }
 
-      const { errors } = verify(configObj, env)
+      const { missingValues } = verify(configObj, env)
 
-      expect(errors.length).toEqual(1)
+      expect(missingValues.length).toEqual(1)
     })
 
     it('does not call the transform function if the env value is missing', () => {
