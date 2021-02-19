@@ -187,10 +187,20 @@ const recursiveVerify = <T>(
   return mappedConf.reduce(reduceConf as any, { config: {}, errors: [] }) as any
 }
 
+export type VerifyReturnObject<T> = {
+  config: MappedConfig<T>
+  missingValues: MissingValue[]
+  missingValueMessages: string[]
+  /**
+   * @deprecated please use missingValues or missingValueMessages instead.
+   */
+  errors: string[]
+}
+
 export function verify<T>(
   config: T extends ConfigWithEnvKeys<T> ? T : never,
   env: { [key: string]: string | undefined } = process.env
-): { config: MappedConfig<T>; missingValues: MissingValue[], missingValueMessages: string[] } {
+): VerifyReturnObject<T> {
   const { config: builtConfig, errors } = recursiveVerify({
     config,
     env
@@ -200,7 +210,7 @@ export function verify<T>(
     ({ envKey, path }) => `environment value ${envKey} is missing from config object at ${path}`
   )
 
-  return { config: builtConfig, missingValues: errors, missingValueMessages }
+  return { config: builtConfig, missingValues: errors, missingValueMessages, errors: missingValueMessages }
 }
 
 export function strictVerify<T>(

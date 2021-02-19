@@ -1,10 +1,17 @@
 # env-verifier
 
-Quickly verify that incoming variables from process.env aren't missing.
+Verify that your environment variables exist, and build up your config object at the same time!
 
 [GitHub](https://github.com/pluralsight/env-verifier)
 
 [NPM](https://npmjs.com/package/env-verifier)
+
+## Package Purpose
+
+Certain types of apps require the use of different variables depending on the environment that the app is run in.
+The purpose of this package is to fail early whenever one of those values is missing from the environment object (ie: `process.env`).
+Using this package properly will prevent the sometimes cryptic errors that occur when environment variables are missing.
+Because every missing environment variable that `env-verifier` encountered is returned (or is displayed in a thrown error), this package can also help with the: `run the app, app crashes because of missing environment variable, add environment variable` loop that sometimes occurs.
 
 ## Getting Started
 
@@ -44,7 +51,7 @@ Use example for `verify`:
 ```javascript
 const { verify } = require('env-verifier')
 
-const { config, errors } = verify({
+const { config, missingValues } = verify({
   database: {
     name: 'DB_NAME'
     host: 'DB_HOST'
@@ -54,7 +61,9 @@ const { config, errors } = verify({
 })
 
 // do custom error logging, possibly throw your own errors
-errors.forEach(console.error)
+missingValues.forEach(
+  ({ envKey, path }) => console.log(`missing env variable: ${envKey} from config at path: ${path}`)
+)
 
 module.exports = config
 ```
@@ -65,13 +74,123 @@ You can pass in your own `env` object as a parameter as long as its an object th
 
 ## Usage Notes
 
- - [Arbitrary Value Insertion](#arbitraryValueInsertion)
- - [Secret Insertion](#secretInsertion)
- - [Error Generation and Reporting](#errorGenerationAndReporting)
- - [Variable Transformation (TransformTuple)](#variableTransformation)
- - [Dynamic Typings](#dynamicTypings)
+ - [Function Parameters and Return Types](#function-parameters-and-return-types)
+ - [Processing Missing Values](#processing-missing-values)
+ - [Arbitrary Value Insertion](#arbitrary-value-insertion)
+ - [Secret Insertion](#secret-insertion)
+ - [Error Generation and Reporting](#error-generation-and-reporting)
+ - [Variable Transformation (TransformTuple)](#variable-transformation)
+ - [Dynamic Typings](#dynamic-typings)
 
-#### <a name="arbitraryValueInsertion"><a/> Arbitrary Value Insertion
+### Function Parameters and Return Types
+
+#### `verify`
+
+```typescript
+export function insert<T>(value: T) => Insert<T> // see `Arbitrary Value Insertion` documentation
+
+export function secret(envKey: string) => Secret // see `Secret Insertion` documentation
+
+export type TransformTuple = [string, (envValue: string) => any]
+
+// Type given as example only, the real type is a bit more complex
+export type ConfigWithEnvKeys<T> = {
+  [P in keyof T]: string | TransformTuple | ReturnType<typeof insert> | ReturnType<typeof secret> | ConfigWithEnvKeys<T[P]>
+}
+
+// Type given as example only, the real type is a bit more complex
+export type MappedConfig<T> = {
+  [P in keyof T]: string | null | ReturnType<typeof secret> | MappedConfig<T[P]> | any // ie: return type of `insert` or `TransformTuple` function
+}
+
+export type MissingValue = {
+  path: string
+  envKey: string
+}
+
+export function verify<T>(
+  config: ConfigWithEnvKeys<T>
+  env: { [key: string]: string | undefined } = process.env
+): {
+  config: MappedConfig<T>,
+  missingValues: MissingValue[],
+  missingValueMessages: string[],
+
+  /**
+   * @deprecated Please use missingValueMessages
+  */
+  errors: string[]
+}
+```
+
+#### `strictVerify`
+
+```typescript
+export function insert<T extends any>(value: T) => Insert<T> // see `Arbitrary Value Insertion` documentation
+
+export function secret(envKey: string) => Secret // see `Secret Insertion` documentation
+
+export type TransformTuple = [string, (envValue: string) => any]
+
+// Type given as example only, the real type is a bit more complex
+export type ConfigWithEnvKeys<T> = {
+  [P in keyof T]: string | TransformTuple | ReturnType<typeof insert> | ReturnType<typeof secret> | ConfigWithEnvKeys<T[P]>
+}
+
+// Type given as example only, the real type is a bit more complex
+// Similar to MappedConfig<T>, but does not contain nulls (except for as returned by `TransformTuple` functions or `insert` calls)
+export type VerifiedConfig<T> = {
+  [P in keyof T]: string | ReturnType<typeof secret> | VerifiedConfig<T[P]> | any // ie: return type of `insert` or `TransformTuple` function
+}
+
+export function strictVerify<T>(
+  config: ConfigWithEnvKeys<T>
+  env: { [key: string]: string | undefined } = process.env
+): VerifiedConfig<T>
+```
+
+ ### Processing Missing Values
+
+An array of objects of type `MissingValue` is returned from the `verify` function.
+
+```typescript
+type MissingValue = {
+  path: string
+  envKey: string
+}
+```
+
+#### `envKey`
+
+The key of the missing `env` value.
+
+#### `path`
+
+The path in the `config` argument to the missing `env` variable.
+Example:
+
+```transcript
+import { verify } from 'env-verifier'
+
+const config = {
+  db: {
+    password: 'DB_PASSWORD'
+  }
+}
+
+const env = {
+  DB_PASSWORD: undefined
+}
+
+const result = verify(config, env)
+
+console.log(result.missingValues)
+// results in:
+// [{ path: 'db.password', envKey: 'DB_PASSWORD' }]
+
+```
+
+### Arbitrary Value Insertion
 
 You may have values that aren't present on your `env` object, but that you would like to live in your config object, this can be achieved by using the `insert()` function.
 
@@ -90,7 +209,7 @@ module.exports = verify({
 }
 ```
 
-#### <a name="secretInsertion"><a/> Secret Insertion
+### Secret Insertion
 
 As of env-verifier version `1.2.0`, the obfuscation of env secrets is supported.
 
@@ -153,22 +272,22 @@ JSON.stringify(config)
 
 ```
 
-#### <a name="errorGenerationAndReporting"><a/> Error Generation and Reporting
+### Error Generation and Reporting
 
 Error reports are generated when an `env` variable is missing. An `env` variable is considered missing under the following circumstances:
 
  - `undefined` is returned from the `env` object.
- - an empty string, `''`, is returned from the `env` object.
+ - an empty string, `''`, is returned from the `env` object. (useful for development with Docker)
  
- `verify` will always return the errors array, but it will be an empty array if there are no `env` misses.
+ `verify` will always return an array of `MissingValue`s, which will be empty if there are no `env` misses.
 
-`strictVerify` will not throw an error on the first encountered missing `env` value. Instead it will continue in order to report all missing `env` variables.
+`strictVerify` will evaluate the entire `config` object before throwing any errors in order to report all missing `env` variables
 
-#### <a name="variableTransformation"><a/> Variable Transformation (TransformTuple)
+### Variable Transformation (TransformTuple)
 
-Since process.env only returns strings, sometimes its necessary to transform those strings into something else (IE: transform the string `"true"` to a boolean `true`)
+Since `env-verifier` only takes environment key-value pair objects that have `strings` as the values, its sometimes necessary to transform those strings into something else (IE: transform the string `"true"` to a boolean `true`)
 
-This can be done by passing in an array (TransformTuple) containing the `env` variable name, and the function that you would like to use to transform the `env` variable value like so:
+This can be done by passing in an array (called a `TransformTuple` in this context) containing the `env` variable name, and the function that you would like to use to transform the `env` variable value like so:
 
 ```javascript
 const config = {
@@ -181,7 +300,9 @@ verify(config)
 
 Transformation functions will not be run if its corresponding env value is missing.
 
-#### <a name="dynamicTypings"><a/> Dynamic Typings
+### Dynamic Typings
+
+**Important**: as of `v1.3.0` `env-verifier` should now be able to correctly and dynamically infer the return types of both `verify` and `strictVerify` without any extra help. the below is only valid for versions that pre-date `v1.3.0`
 
 `env-verifier` tries to give typescript typings for the config object that it returns, but needs a little help to get the correct types
 
@@ -197,7 +318,7 @@ const config: {
 }
 
 const verifiedConfig = strictVerify(config)
-// typings:
+// pre-v1.3.0 typings:
 // typeof verifiedConfig = {
 //   a: VerifiedConfig<unknown>
 //   b: VerifiedConfig<unknown>
@@ -235,9 +356,9 @@ const verifiedConfig = strictVerify<typeof config>(config)
 // }
 ```
 
-### Prerequisites
+## Prerequisites
 
-This package is written in TypeScript and is built/distributed for environments that support the majority of the es2016 specification.
+This package is written in TypeScript@4.1.5 and is built/distributed for environments that support the majority of the es2016 specification.
 
 This package also works best with projects that have centralized config files, IE: You map your `.env` variables to a `config` object in a file, and `import`/`require` that config object wherever you need `.env` values.
 
