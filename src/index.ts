@@ -1,16 +1,24 @@
 type Cast<X extends any, Y extends any> = X extends Y ? X : Y
 
-type TransformTuple_<U extends any> = (string | ((_: string) => U))[] 
+type TransformTuple_<U extends any> = (string | ((_: string) => U))[]
 
-type MappedConfigElement_<E extends any> = 
-  E extends any[] ? E extends TransformTuple_<infer R> ? R : never
-  : E extends InsertValue<infer U> ? U
-  : E extends SecretKey ? Secret
-  : E extends string ? string | undefined
+type MappedConfigElement_<E extends any> = E extends any[]
+  ? E extends TransformTuple_<infer R>
+    ? R
+    : never
+  : E extends InsertValue<infer U>
+  ? U
+  : E extends SecretKey
+  ? Secret
+  : E extends string
+  ? string | undefined
   : MappedConfig<E>
 
-type MappedConfigElement<E extends any> = MappedConfigElement_<E> extends infer X ? Cast<X, any> : never
-
+type MappedConfigElement<E extends any> = MappedConfigElement_<
+  E
+> extends infer X
+  ? Cast<X, any>
+  : never
 
 export type MappedConfig<T> = {
   [P in keyof T]: MappedConfigElement<T[P]>
@@ -109,8 +117,10 @@ const getEnvValueOrErrorCurried = (
 const getMapConfigFunction = <T>({
   config,
   env,
-  path = ''
-}: VerifyParamCollection<T>) => <P extends keyof T>(key: P): [MappedConfigElement<T[P]>, MissingValue[]] => {
+  path = '',
+}: VerifyParamCollection<T>) => <P extends keyof T>(
+  key: P
+): [MappedConfigElement<T[P]>, MissingValue[]] => {
   const value = config[key]
   const subPath = path.length === 0 ? key + '' : `${path}.${key}`
 
@@ -121,48 +131,36 @@ const getMapConfigFunction = <T>({
     const [secretValue, errors] = getEnvValueOrError(secretKey)
     return [
       { [key]: getSecretObject(secretValue) } as MappedConfigElement<T[P]>,
-      errors
+      errors,
     ]
   }
 
   if (value instanceof InsertValue) {
-    return [
-      { [key]: value.value } as MappedConfigElement<T[P]>,
-      []
-    ]
+    return [{ [key]: value.value } as MappedConfigElement<T[P]>, []]
   }
 
   if (Array.isArray(value)) {
-    const [envKey, transformFn] = (value as any)
+    const [envKey, transformFn] = value as any
     const [envValue, errors] = getEnvValueOrError(envKey)
 
     const transformedValue = envValue && transformFn(envValue)
 
-    return [
-      { [key]: transformedValue } as MappedConfigElement<T[P]>,
-      errors
-    ]
+    return [{ [key]: transformedValue } as MappedConfigElement<T[P]>, errors]
   }
 
   if (typeof value === 'string') {
     const [envValue, errors] = getEnvValueOrError(value as string)
 
-    return [
-      { [key]: envValue } as MappedConfigElement<T[P]>,
-      errors
-    ]
+    return [{ [key]: envValue } as MappedConfigElement<T[P]>, errors]
   }
 
   const { errors, config: subConfig } = recursiveVerify({
     config: value as ConfigWithEnvKeys<T[P]>,
     env,
-    path: subPath
+    path: subPath,
   })
 
-  return [
-      { [key]: subConfig } as MappedConfigElement<T[P]>,
-      errors
-    ]
+  return [{ [key]: subConfig } as MappedConfigElement<T[P]>, errors]
 }
 
 const reduceConf = <T>(
@@ -172,9 +170,9 @@ const reduceConf = <T>(
   return {
     config: {
       ...acc.config,
-      ...config
+      ...config,
     },
-    errors: acc.errors.concat(errors)
+    errors: acc.errors.concat(errors),
   }
 }
 
@@ -182,7 +180,9 @@ const recursiveVerify = <T>(
   paramCollection: VerifyParamCollection<T>
 ): { config: MappedConfig<T>; errors: MissingValue[] } => {
   const mapConf = getMapConfigFunction(paramCollection)
-  const mappedConf: [MappedConfig<T>, MissingValue[]] = Object.keys(paramCollection.config).map(mapConf as any) as any
+  const mappedConf: [MappedConfig<T>, MissingValue[]] = Object.keys(
+    paramCollection.config
+  ).map(mapConf as any) as any
 
   return mappedConf.reduce(reduceConf as any, { config: {}, errors: [] }) as any
 }
@@ -203,14 +203,20 @@ export function verify<T>(
 ): VerifyReturnObject<T> {
   const { config: builtConfig, errors } = recursiveVerify({
     config,
-    env
+    env,
   })
 
   const missingValueMessages = errors.map(
-    ({ envKey, path }) => `environment value ${envKey} is missing from config object at ${path}`
+    ({ envKey, path }) =>
+      `environment value ${envKey} is missing from config object at ${path}`
   )
 
-  return { config: builtConfig, missingValues: errors, missingValueMessages, errors: missingValueMessages }
+  return {
+    config: builtConfig,
+    missingValues: errors,
+    missingValueMessages,
+    errors: missingValueMessages,
+  }
 }
 
 export function strictVerify<T>(
@@ -220,7 +226,9 @@ export function strictVerify<T>(
   const { config: builtConfig, missingValueMessages } = verify(config, env)
 
   if (missingValueMessages.length > 0) {
-    throw new Error(`Missing configuration values: ${missingValueMessages.join('\n')}`)
+    throw new Error(
+      `Missing configuration values: ${missingValueMessages.join('\n')}`
+    )
   }
   return builtConfig as VerifiedConfig<T>
 }

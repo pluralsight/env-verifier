@@ -1,27 +1,21 @@
 import * as util from 'util'
 
-import {
-  verify,
-  strictVerify,
-  insert,
-  TransformTuple,
-  secret
-} from './index'
+import { verify, strictVerify, insert, TransformTuple, secret } from './index'
 
 describe('env-verify', () => {
   describe('verify', () => {
     it('matches flat objects values to provided source keys', () => {
       const env = {
         DB_HOST: 'localhost:3000',
-        DB_NAME: 'postgres'
+        DB_NAME: 'postgres',
       }
       const flatConfig = {
         dbHost: 'DB_HOST',
-        dbName: 'DB_NAME'
+        dbName: 'DB_NAME',
       }
       const expected = {
         dbHost: 'localhost:3000',
-        dbName: 'postgres'
+        dbName: 'postgres',
       }
       const results = verify(flatConfig, env)
 
@@ -32,25 +26,25 @@ describe('env-verify', () => {
       const env = {
         c: 'C',
         d: 'D',
-        e: 'E'
+        e: 'E',
       }
       const nestedConfig = {
         1: {
           2: {
-            3: 'c'
+            3: 'c',
           },
-          4: 'd'
+          4: 'd',
         },
-        5: 'e'
+        5: 'e',
       }
       const expected = {
         1: {
           2: {
-            3: 'C'
+            3: 'C',
           },
-          4: 'D'
+          4: 'D',
         },
-        5: 'E'
+        5: 'E',
       }
       const results = verify(nestedConfig, env)
 
@@ -58,18 +52,18 @@ describe('env-verify', () => {
     })
     describe('with missing values', () => {
       const env = {
-        PRESENT: 'present'
+        PRESENT: 'present',
       }
       const config = {
         1: 'PRESENT',
         2: 'MISSING',
         3: {
           6: {
-            7: 'MISSING'
+            7: 'MISSING',
           },
           4: 'MISSING',
-          5: 'MISSING'
-        }
+          5: 'MISSING',
+        },
       }
       const verifiedConfig = verify(config, env)
 
@@ -77,30 +71,34 @@ describe('env-verify', () => {
         const { missingValues } = verifiedConfig
 
         expect(missingValues.length).toEqual(4)
-        expect(missingValues).toEqual(expect.arrayContaining([
-          { envKey: 'MISSING', path: '2' },
-          { envKey: 'MISSING', path: '3.6.7' },
-          { envKey: 'MISSING', path: '3.4' },
-          { envKey: 'MISSING', path: '3.4' },
-          { envKey: 'MISSING', path: '3.5' }
-        ]))
+        expect(missingValues).toEqual(
+          expect.arrayContaining([
+            { envKey: 'MISSING', path: '2' },
+            { envKey: 'MISSING', path: '3.6.7' },
+            { envKey: 'MISSING', path: '3.4' },
+            { envKey: 'MISSING', path: '3.4' },
+            { envKey: 'MISSING', path: '3.5' },
+          ])
+        )
       })
       it('should return an array of missing value messages', () => {
         const { missingValueMessages } = verifiedConfig
 
         expect(missingValueMessages.length).toEqual(4)
-        missingValueMessages.forEach((item) => expect(typeof item === 'string').toBe(true))
+        missingValueMessages.forEach((item) =>
+          expect(typeof item === 'string').toBe(true)
+        )
       })
     })
   })
 
   describe('with transform functions', () => {
     const env = {
-      PRESENT: 'present'
+      PRESENT: 'present',
     }
     it('allows a tuple with a string and transform function', () => {
       const configObj = {
-        present: ['PRESENT', (envVal: string): any => envVal]
+        present: ['PRESENT', (envVal: string): any => envVal],
       }
 
       expect(() => verify(configObj, env)).not.toThrow()
@@ -109,8 +107,10 @@ describe('env-verify', () => {
     it('allows the same tuple in a nested object', () => {
       const configObj = {
         nested: {
-          present: ['PRESENT', (envVal: string) => envVal] as TransformTuple<string>
-        }
+          present: ['PRESENT', (envVal: string) => envVal] as TransformTuple<
+            string
+          >,
+        },
       }
       const result = verify<typeof configObj>(configObj, env).config
 
@@ -121,7 +121,7 @@ describe('env-verify', () => {
       const transformed = ['hi', { there: ['this'] }, 'is', 'transformed']
 
       const configObj = {
-        present: ['PRESENT', (_envVal: string) => transformed]
+        present: ['PRESENT', (_envVal: string) => transformed],
       }
 
       const { present: result } = verify(configObj, env).config
@@ -131,7 +131,7 @@ describe('env-verify', () => {
 
     it('still returns an error if the env value is missing', () => {
       const configObj = {
-        missing: ['MISSING', (envValue: string) => envValue]
+        missing: ['MISSING', (envValue: string) => envValue],
       }
 
       const { missingValues } = verify(configObj, env)
@@ -143,7 +143,7 @@ describe('env-verify', () => {
       const transformFn = jest.fn()
 
       const configObj: any = {
-        missing: ['MISSING', transformFn]
+        missing: ['MISSING', transformFn],
       }
 
       verify(configObj, env)
@@ -155,18 +155,18 @@ describe('env-verify', () => {
   describe('strictVerify', () => {
     it('should throw an error on missing .env value', () => {
       const env = {
-        a: 'A'
+        a: 'A',
       }
       const config = {
         1: 'a',
         2: 'zz-top',
         3: {
           6: {
-            7: 'IM_ALSO_MISSING'
+            7: 'IM_ALSO_MISSING',
           },
           4: 'IM_MISSING',
-          5: 'ME_TOO'
-        }
+          5: 'ME_TOO',
+        },
       }
       expect(() => strictVerify(config, env)).toThrowError()
     })
@@ -174,15 +174,15 @@ describe('env-verify', () => {
     it('should not throw an error when all .env values are present', () => {
       const env = {
         a: 'A',
-        'zz-top': 'ZZ_TOP'
+        'zz-top': 'ZZ_TOP',
       }
       const config = {
         1: 'a',
-        2: 'zz-top'
+        2: 'zz-top',
       }
       const expected = {
         1: 'A',
-        2: 'ZZ_TOP'
+        2: 'ZZ_TOP',
       }
 
       expect(strictVerify(config, env)).toEqual(expected)
@@ -191,11 +191,11 @@ describe('env-verify', () => {
 
   describe('with insert()', () => {
     const env = {
-      PRESENT: 'present'
+      PRESENT: 'present',
     }
     it('does not error out when called with insert()', () => {
       const configObj = {
-        nonEnvValue: insert('nonEnvValue')
+        nonEnvValue: insert('nonEnvValue'),
       }
 
       expect(() => verify(configObj, env)).not.toThrow()
@@ -203,7 +203,7 @@ describe('env-verify', () => {
 
     it('inserts the given value into config object', () => {
       const configObj = {
-        nonEnvValue: insert('nonEnvValue')
+        nonEnvValue: insert('nonEnvValue'),
       }
 
       const { nonEnvValue } = verify(configObj, env).config
@@ -214,8 +214,8 @@ describe('env-verify', () => {
     it('inserts given value in nested config object', () => {
       const configObj = {
         a: {
-          nonEnvValue: insert('nonEnvValue')
-        }
+          nonEnvValue: insert('nonEnvValue'),
+        },
       }
 
       const { config } = verify<typeof configObj>(configObj, env)
@@ -227,12 +227,12 @@ describe('env-verify', () => {
   describe('with secret()', () => {
     const env = {
       PASSWORD: 'this is a password',
-      NOT_PASSWORD: 'this is not a password'
+      NOT_PASSWORD: 'this is not a password',
     }
 
     it('allows the use of the secret function', () => {
       const configObj = {
-        password: secret('PASSWORD')
+        password: secret('PASSWORD'),
       }
 
       const result = verify(configObj, env)
@@ -242,7 +242,7 @@ describe('env-verify', () => {
 
     it('obscures secret when config object is coerced to string', () => {
       const configObj = {
-        password: secret('PASSWORD')
+        password: secret('PASSWORD'),
       }
 
       const result = verify(configObj, env).config
@@ -254,8 +254,8 @@ describe('env-verify', () => {
     it('supports nested secrets', () => {
       const configObj = {
         hasAPassword: {
-          password: secret('PASSWORD')
-        }
+          password: secret('PASSWORD'),
+        },
       }
 
       const result = verify(configObj, env).config
@@ -268,9 +268,9 @@ describe('env-verify', () => {
       const configObj = {
         hasAPassword: {
           password: secret('PASSWORD'),
-          password2: secret('PASSWORD')
+          password2: secret('PASSWORD'),
         },
-        password: secret('PASSWORD')
+        password: secret('PASSWORD'),
       }
 
       const result = verify(configObj, env).config
@@ -281,7 +281,7 @@ describe('env-verify', () => {
 
     it('obfuscates secrets when using util.inspect (for nodejs)', () => {
       const configObj = {
-        password: secret('PASSWORD')
+        password: secret('PASSWORD'),
       }
       const { config } = verify(configObj, env)
 
@@ -295,19 +295,19 @@ describe('env-verify', () => {
   describe('integration of all features', () => {
     const env = {
       PRESENT: 'present',
-      SECRET: 'somethingSecret'
+      SECRET: 'somethingSecret',
     }
 
     const mixed = {
       present: 'PRESENT',
       transformed: ['PRESENT', (_value: string) => 'transformed'],
       inserted: insert('inserted'),
-      secret: secret('SECRET')
+      secret: secret('SECRET'),
     }
 
     const configObj = {
       mixed,
-      ...mixed
+      ...mixed,
     }
 
     const { config: result } = verify(configObj, env)
@@ -322,8 +322,8 @@ describe('env-verify', () => {
           present: 'present',
           transformed: 'transformed',
           inserted: 'inserted',
-          secret: '[secret]'
-        }
+          secret: '[secret]',
+        },
       })
 
       expect(JSON.parse(JSON.stringify(result))).toEqual(expected)
