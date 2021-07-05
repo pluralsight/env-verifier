@@ -1,118 +1,20 @@
-type Cast<X extends any, Y extends any> = X extends Y ? X : Y
-
-type TransformTuple_<U extends any> = (string | ((_: string) => U))[]
-
-type MappedConfigElement_<E extends any> = E extends any[]
-  ? E extends TransformTuple_<infer R>
-    ? R
-    : never
-  : E extends InsertValue<infer U>
-  ? U
-  : E extends SecretKey
-  ? Secret
-  : E extends string
-  ? string | undefined
-  : MappedConfig<E>
-
-type MappedConfigElement<E extends any> = MappedConfigElement_<
-  E
-> extends infer X
-  ? Cast<X, any>
-  : never
-
-export type MappedConfig<T> = {
-  [P in keyof T]: MappedConfigElement<T[P]>
-}
-
-export type TransformTuple<T> = [string, (_: string) => T]
-
-export type ConfigWithEnvKeys<T> = {
-  [P in keyof T]: T[P] extends InsertValue<infer U>
-    ? InsertValue<U>
-    : T[P] extends SecretKey
-    ? SecretKey
-    : T[P] extends string
-    ? string
-    : T[P] extends TransformTuple<infer U>
-    ? TransformTuple<U>
-    : T[P] extends ConfigWithEnvKeys<T[P]>
-    ? ConfigWithEnvKeys<T[P]>
-    : never
-}
-
-type MissingValue = {
-  path: string
-  envKey: string
-}
-
-interface VerifyParamCollection<T> {
-  config: T extends ConfigWithEnvKeys<T> ? T : never
-  env: { [key: string]: string | undefined }
-  path?: string
-}
-
-export type VerifiedConfig<T> = {
-  [P in keyof T]: T[P] extends SecretKey
-    ? Secret
-    : T[P] extends TransformTuple_<infer U>
-    ? U
-    : T[P] extends InsertValue<infer U>
-    ? U
-    : T[P] extends string
-    ? string
-    : VerifiedConfig<T[P]>
-}
-
-export class InsertValue<T> {
-  value: T
-  constructor(value: T) {
-    this.value = value
-  }
-}
-
-export class SecretKey {
-  secret: string
-  constructor(secret: string) {
-    this.secret = secret
-  }
-}
-
-export class Secret {
-  toJSON() {
-    return '[secret]'
-  }
-  reveal: { (): string }
-
-  constructor(secret: string) {
-    this.reveal = () => secret
-  }
-}
-
-const isNode = () =>
-  typeof process === 'object' && process + '' === '[object process]'
-
-const getSecretObject = (secret: string) => {
-  const secretObj = new Secret(secret) as any
-
-  if (isNode()) {
-    const util = require('util')
-    secretObj[util.inspect.custom] = () => '[secret]'
-  }
-
-  return secretObj as Secret
-}
-
-const getEnvValueOrErrorCurried = (
-  env: { [key: string]: string },
-  subPath: string
-) => (key: string): [string, MissingValue[]] => {
-  const envValue = env[key]
-  if (envValue === undefined || envValue.length === 0) {
-    const error: MissingValue = { envKey: key, path: subPath }
-    return [undefined, [error]]
-  }
-  return [envValue, [] as MissingValue[]]
-}
+import {
+  ConfigWithEnvKeys,
+  MappedConfig,
+  VerifiedConfig,
+  MissingValue,
+  VerifyParamCollection,
+  MappedConfigElement,
+  TransformTuple,
+} from './types'
+import {
+  InsertValue,
+  SecretKey,
+  TransformValue,
+} from './classes'
+import {
+  getResolvers
+} from './config-resolvers'
 
 const getMapConfigFunction = <T>({
   config,
@@ -122,37 +24,24 @@ const getMapConfigFunction = <T>({
   key: P
 ): [MappedConfigElement<T[P]>, MissingValue[]] => {
   const value = config[key]
-  const subPath = path.length === 0 ? key + '' : `${path}.${key}`
+  const subPath = path.length === 0 ? `${key}` : `${path}.${key}`
 
-  const getEnvValueOrError = getEnvValueOrErrorCurried(env, subPath)
+  const {
+    resolveSecret,
+    resolveInsert,
+    resolveTransformTuple,
+    resolveTransformer,
+    resolveEnvValue
+  } = getResolvers<T, P>(env, subPath)
 
-  if (value instanceof SecretKey) {
-    const secretKey = value.secret
-    const [secretValue, errors] = getEnvValueOrError(secretKey)
-    return [
-      { [key]: getSecretObject(secretValue) } as MappedConfigElement<T[P]>,
-      errors,
-    ]
-  }
+  if (value instanceof SecretKey) return resolveSecret(key, value)
 
-  if (value instanceof InsertValue) {
-    return [{ [key]: value.value } as MappedConfigElement<T[P]>, []]
-  }
+  if (value instanceof InsertValue) return resolveInsert(key, value)
 
-  if (Array.isArray(value)) {
-    const [envKey, transformFn] = value as any
-    const [envValue, errors] = getEnvValueOrError(envKey)
+  if (value instanceof TransformValue) return resolveTransformer(key, value)
+  if (Array.isArray(value)) return resolveTransformTuple(key, value as TransformTuple<unknown>)
 
-    const transformedValue = envValue && transformFn(envValue)
-
-    return [{ [key]: transformedValue } as MappedConfigElement<T[P]>, errors]
-  }
-
-  if (typeof value === 'string') {
-    const [envValue, errors] = getEnvValueOrError(value as string)
-
-    return [{ [key]: envValue } as MappedConfigElement<T[P]>, errors]
-  }
+  if (typeof value === 'string') return resolveEnvValue(key, value)
 
   const { errors, config: subConfig } = recursiveVerify({
     config: value as ConfigWithEnvKeys<T[P]>,
@@ -160,7 +49,7 @@ const getMapConfigFunction = <T>({
     path: subPath,
   })
 
-  return [{ [key]: subConfig } as MappedConfigElement<T[P]>, errors]
+  return [{ [key]: subConfig }, errors] as [MappedConfigElement<T[P]>, MissingValue[]]
 }
 
 const reduceConf = <T>(
@@ -240,3 +129,30 @@ export function insert<T>(value: T): InsertValue<T> {
 export function secret(envKey: string) {
   return new SecretKey(envKey)
 }
+
+export function transform<T>(envKey: string, transformFunction: (envValue: string) => T) {
+  return new TransformValue<T>(envKey, transformFunction)
+}
+
+export function transformFP<T>(transformFunction: (envValue: string) => T, envKey: string): TransformValue<T>
+export function transformFP<T>(transformFunction: (envValue: string) => T): (envKey: string) => TransformValue<T>
+export function transformFP<T>(transformFunction: (envValue: string) => T, envKey?: string) {
+  if (envKey) return new TransformValue<T>(envKey, transformFunction)
+  return (envKey_: string) => new TransformValue<T>(envKey_, transformFunction)
+}
+
+
+export {
+  ConfigWithEnvKeys,
+  MappedConfig,
+  VerifiedConfig,
+  MappedConfigElement,
+  TransformTuple,
+} from './types'
+
+export {
+  TransformValue,
+  InsertValue,
+  SecretKey,
+  Secret
+} from './classes'

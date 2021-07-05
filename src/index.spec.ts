@@ -1,6 +1,7 @@
 import * as util from 'util'
 
-import { verify, strictVerify, insert, TransformTuple, secret } from './index'
+import { verify, strictVerify, insert, secret, transform } from './index'
+import { TransformTuple } from './types'
 
 describe('env-verify', () => {
   describe('verify', () => {
@@ -93,62 +94,122 @@ describe('env-verify', () => {
   })
 
   describe('with transform functions', () => {
-    const env = {
-      PRESENT: 'present',
-    }
-    it('allows a tuple with a string and transform function', () => {
-      const configObj = {
-        present: ['PRESENT', (envVal: string): any => envVal],
+    describe('TransformTuple', () => {
+      const env = {
+        PRESENT: 'present',
       }
+      it('allows a tuple with a string and transform function', () => {
+        const configObj = {
+          present: ['PRESENT', (envVal: string): any => envVal],
+        }
 
-      expect(() => verify(configObj, env)).not.toThrow()
+        expect(() => verify(configObj, env)).not.toThrow()
+      })
+
+      it('allows the same tuple in a nested object', () => {
+        const configObj = {
+          nested: {
+            present: ['PRESENT', (envVal: string) => envVal] as TransformTuple<
+              string
+            >,
+          },
+        }
+        const result = verify<typeof configObj>(configObj, env).config
+
+        expect(result.nested.present).toEqual(env.PRESENT)
+      })
+
+      it('runs the transform function and inserts the transformed value', () => {
+        const transformed = ['hi', { there: ['this'] }, 'is', 'transformed']
+
+        const configObj = {
+          present: ['PRESENT', (_envVal: string) => transformed],
+        }
+
+        const { present: result } = verify(configObj, env).config
+
+        expect(result).toEqual(transformed)
+      })
+
+      it('still returns an error if the env value is missing', () => {
+        const configObj = {
+          missing: ['MISSING', (envValue: string) => envValue],
+        }
+
+        const { missingValues } = verify(configObj, env)
+
+        expect(missingValues.length).toEqual(1)
+      })
+
+      it('does not call the transform function if the env value is missing', () => {
+        const transformFn = jest.fn()
+
+        const configObj: any = {
+          missing: ['MISSING', transformFn],
+        }
+
+        verify(configObj, env)
+
+        expect(transformFn).not.toHaveBeenCalled()
+      })
     })
 
-    it('allows the same tuple in a nested object', () => {
-      const configObj = {
-        nested: {
-          present: ['PRESENT', (envVal: string) => envVal] as TransformTuple<
-            string
-          >,
-        },
+    describe('TransformValue (#transform)', () => {
+      const env = {
+        PRESENT: 'present',
       }
-      const result = verify<typeof configObj>(configObj, env).config
+      it('accepts an env key and a transforming function', () => {
+        const configObj = {
+          present: transform('PRESENT', (envVal: string): any => envVal),
+        }
 
-      expect(result.nested.present).toEqual(env.PRESENT)
-    })
+        expect(() => verify(configObj, env)).not.toThrow()
+      })
 
-    it('runs the transform function and inserts the transformed value', () => {
-      const transformed = ['hi', { there: ['this'] }, 'is', 'transformed']
+      it('supports transforms in a nested object', () => {
+        const configObj = {
+          nested: {
+            present: transform('PRESENT', (envVal: string) => envVal),
+          },
+        }
+        const result = verify<typeof configObj>(configObj, env).config
 
-      const configObj = {
-        present: ['PRESENT', (_envVal: string) => transformed],
-      }
+        expect(result.nested.present).toEqual(env.PRESENT)
+      })
 
-      const { present: result } = verify(configObj, env).config
+      it('runs the transform function and inserts the transformed value', () => {
+        const transformed = ['hi', { there: ['this'] }, 'is', 'transformed']
 
-      expect(result).toEqual(transformed)
-    })
+        const configObj = {
+          present: transform('PRESENT', (_envVal: string) => transformed),
+        }
 
-    it('still returns an error if the env value is missing', () => {
-      const configObj = {
-        missing: ['MISSING', (envValue: string) => envValue],
-      }
+        const { present: result } = verify(configObj, env).config
 
-      const { missingValues } = verify(configObj, env)
+        expect(result).toEqual(transformed)
+      })
 
-      expect(missingValues.length).toEqual(1)
-    })
+      it('still returns an error if the env value is missing', () => {
+        const configObj = {
+          missing: transform('MISSING', (envValue: string) => envValue),
+        }
 
-    it('does not call the transform function if the env value is missing', () => {
-      const transformFn = jest.fn()
+        const { missingValues } = verify(configObj, env)
 
-      const configObj: any = {
-        missing: ['MISSING', transformFn],
-      }
+        expect(missingValues.length).toEqual(1)
+      })
 
-      verify(configObj, env)
+      it('does not call the transform function if the env value is missing', () => {
+        const transformFn = jest.fn()
 
-      expect(transformFn).not.toHaveBeenCalled()
+        const configObj: any = {
+          missing: transform('MISSING', transformFn),
+        }
+
+        verify(configObj, env)
+
+        expect(transformFn).not.toHaveBeenCalled()
+      })
     })
   })
 
@@ -300,7 +361,8 @@ describe('env-verify', () => {
 
     const mixed = {
       present: 'PRESENT',
-      transformed: ['PRESENT', (_value: string) => 'transformed'],
+      transformedTuple: ['PRESENT', (_value: string) => 'transformedTuple'],
+      transformed: transform('PRESENT', (_value: string) => 'transformed'),
       inserted: insert('inserted'),
       secret: secret('SECRET'),
     }
@@ -315,11 +377,13 @@ describe('env-verify', () => {
     it('mixes and matches features across nested config object', () => {
       const expected = expect.objectContaining({
         present: 'present',
+        transformedTuple: 'transformedTuple',
         transformed: 'transformed',
         inserted: 'inserted',
         secret: '[secret]',
         mixed: {
           present: 'present',
+          transformedTuple: 'transformedTuple',
           transformed: 'transformed',
           inserted: 'inserted',
           secret: '[secret]',
