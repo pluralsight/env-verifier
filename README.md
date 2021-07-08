@@ -389,8 +389,6 @@ However `env-verifier` excels in the following:
 * Size: ~8kb packed, ~18kb unpacked, 4 source files total
 * No production dependancies
 
-One last subjectivly good thing about `env-verifier` is that it does not support default config values (or rather, it allows them, but it is not easy to add them, and it looks bad when it's done). This was a deliberate design decision that supports the idea that an app should fail hard and fast if it isn't configured correctly.
-
 ## Prerequisites
 
 This package is written in TypeScript@4.1.5 and is built/distributed for environments that support the majority of the es2016 specification.
