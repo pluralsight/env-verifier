@@ -82,9 +82,9 @@ You can pass in your own `env` object as a parameter as long as its an object th
  - [Arbitrary Value Insertion](#arbitrary-value-insertion)
  - [Secret Insertion](#secret-insertion)
  - [Error Generation and Reporting](#error-generation-and-reporting)
- - [Variable Transformation (TransformTuple/Transform)](#variable-transformation)
+ - [Variable Transformation](#variable-transformation)
  - [Dynamic Typings](#dynamic-typings)
- - [`env-verifier` vs `convict`](#vs-convict)
+ - [`env-verifier` vs `convict`](#env-verifier-vs-convict)
 
 ### Function Parameters and Return Types
 
@@ -289,7 +289,7 @@ Error reports are generated when an `env` variable is missing. An `env` variable
 
 `strictVerify` will evaluate the entire `config` object before throwing any errors in order to report all missing `env` variables
 
-### Variable Transformation (TransformTuple/Transform)
+### Variable Transformation
 
 Since `env-verifier` only takes environment key-value pair objects that have `strings` as the values, its sometimes necessary to transform those strings into something else (IE: transform the string `"true"` to a boolean `true`)
 
@@ -368,7 +368,7 @@ const verifiedConfig = strictVerify<typeof config>(config)
 // }
 ```
 
-### `env-verifier` vs [`convict`](https://github.com/mozilla/node-convict)
+### `env-verifier` vs `convict`
 
 Mozilla produces the excellent [`convict`](https://github.com/mozilla/node-convict) package that does most (if not all) of the same things that this package does. Here are a quick list of comparisons between the two:
 
@@ -379,15 +379,15 @@ Mozilla produces the excellent [`convict`](https://github.com/mozilla/node-convi
 | Environmental Variables | ✔️ | ✔️ |
 | Command-line arguments | ❌ | ✔️ |
 | Validation | ✔️ | ✔️ |
-| Secret Ofuscation | ✔️ | ✔️ |
+| Secret Obfuscation | ✔️ | ✔️ |
 
-Looking at that list, it seems like `convict` is the obvious choice, and in many cases it is, especially if your project is a large one with many different changing contributers.
+`convict` does more than `env-verifier` and may be the correct choice for your project, especially if your project is a large one with many different changing contributors.
 
 However `env-verifier` excels in the following:
 
 * Simplicity: Does one thing, and does it well
 * Size: ~8kb packed, ~18kb unpacked, 4 source files total
-* No production dependancies
+* No production dependencies
 
 ## Prerequisites
 
