@@ -306,17 +306,39 @@ Here is an example for both:
 const config = {
   useNewFeature: ['USE_NEW_FEATURE', trueOrFalse => trueOrFalse === 'true'], // results a boolean
   serverHosts: ['SERVER_HOSTS', csvString => csvString.split(',')] // results in a string array
+  buildDate: transform('BUILD_DATE', dateString => new Date(dateString)) // results in a `Date` object
   ... //other env variables
 }
 
 module.exports = verify(config)
 ```
 
-Transformation functions will not be run if its corresponding env value is missing.
+Functions passed to either `transform` or given in a `TransformTuple` will not be run if its corresponding env value is missing.
+
+A `transformFP` function is also provided that accepts the transforming function first and will return a partially applied function if an environment key string is not supplied:
+
+```javascript
+import { transformFP, verify } from 'env-verifier'
+
+const parseBoolean = transformFP(trueOrFalse => trueOrFalse === 'true')
+
+export const config = verify({
+  useNewFeature: parseBoolean('USE_NEW_FEATURE'), // results in a boolean value
+  hosts: transformFP(csvList => csvList.split(','), 'HOSTS') // results in a string array
+  ... other values
+})
+
+```
 
 ### Dynamic Typings
 
-**Important**: as of `v1.4.0`, `env-verifier` should now be able to correctly and dynamically infer the return types of both `verify` and `strictVerify` without any extra help. the below is only valid for versions that pre-date `v1.4.0`
+---
+
+**Important**
+
+As of `v1.4.0`, `env-verifier` should now be able to correctly and dynamically infer the return types of both `verify` and `strictVerify` without any extra help. the below is only valid for versions that pre-date `v1.4.0`
+
+---
 
 `env-verifier` tries to give typescript typings for the config object that it returns, but needs a little help to get the correct types
 
@@ -383,7 +405,7 @@ Mozilla produces the excellent [`convict`](https://github.com/mozilla/node-convi
 | Validation | ✔️ | ✔️ |
 | Secret Obfuscation | ✔️ | ✔️ |
 
-`convict` does more than `env-verifier` and may be the correct choice for your project, especially if your project is a large one with many different changing contributors.
+`convict` does more than what's included on the above list, and certainly more than `env-verifier` can do; so, it may be the correct choice for your project, especially if your project is a large one with many different/changing contributors.
 
 However `env-verifier` excels in the following:
 
