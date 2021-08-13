@@ -3,7 +3,6 @@
 Verify that your environment variables exist, and build up your config object at the same time!
 
 ![Build](https://github.com/pluralsight/env-verifier/actions/workflows/test-and-release.yml/badge.svg?branch=master)
-![Tests](https://github.com/pluralsight/env-verifier/actions/workflows/test-and-release.yml/badge.svg?branch=master)
 
 [GitHub](https://github.com/pluralsight/env-verifier)
 
