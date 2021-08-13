@@ -1,6 +1,6 @@
 import * as util from 'util'
 
-import { verify, strictVerify, insert, secret, transform } from './index'
+import { verify, strictVerify, insert, secret, transform, transformFP } from './index'
 import { TransformTuple } from './types'
 
 describe('env-verify', () => {
@@ -209,6 +209,30 @@ describe('env-verify', () => {
         verify(configObj, env)
 
         expect(transformFn).not.toHaveBeenCalled()
+      })
+    })
+
+    describe('TransformValue (#transformFP)', () => {
+      const env = {
+        PRESENT: 'present',
+      }
+      it('allows the full application of the function', () => {
+        const configObj = {
+          present: transformFP((envVal: string) => envVal, 'PRESENT'),
+        }
+
+        expect(() => verify(configObj, env)).not.toThrow()
+        expect(verify(configObj, env).config).toEqual({ present: 'present' })
+      })
+
+      it('allows partial application of the function', () => {
+        const identity = transformFP((envVal: string) => envVal)
+        const configObj = {
+          present: identity('PRESENT'),
+        }
+
+        expect(() => verify(configObj, env)).not.toThrow()
+        expect(verify(configObj, env).config).toEqual({ present: 'present' })
       })
     })
   })
