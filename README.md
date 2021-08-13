@@ -97,7 +97,10 @@ export function insert<T>(value: T) => Insert<T> // see `Arbitrary Value Inserti
 
 export function secret(envKey: string) => Secret // see `Secret Insertion` documentation
 
-export function transform(envKey: string, transformFn: (envValue: string) => any) => Secret // see `TransformTuple/Transform` documentation
+export function transform<T>(envKey: string, transformFn: (envValue: string) => T) => T // see `Variable Transformation` documentation
+
+export function transformFP<T>(transformFn: (envValue: string) => T, envKey: string) => T
+export function transformFP<T>(transformFn: (envValue: string) => T) => ((envKey: string) => T) // see `Variable Transformation` documentation
 
 export type TransformTuple = [string, (envValue: string) => any]
 
